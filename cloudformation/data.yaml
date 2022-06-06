@@ -1,0 +1,68 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+# https://s3.amazonaws.com/cloudformation.jsonize.com/archimedes/data.yaml
+
+Description: Resources for setting up all data for Archimedes.
+
+
+Parameters:
+
+  DynamoJobTableName:
+    Type: String
+    Description: The name of the DynamoDB job table
+
+
+Resources:
+
+  DynamoDBTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      TableClass: STANDARD
+      TableName: !Ref DynamoJobTableName
+      KeySchema:
+        - AttributeName: "jobId"
+          KeyType: "HASH"
+      GlobalSecondaryIndexes:
+        - IndexName: "jobType:jobId"
+          KeySchema:
+            - AttributeName: "jobType"
+              KeyType: "HASH"
+            - AttributeName: "jobId"
+              KeyType: "RANGE"
+          Projection:
+            ProjectionType: "ALL"
+        - IndexName: "jobType+State:jobId"
+          KeySchema:
+            - AttributeName: "jobTypeState"
+              KeyType: "HASH"
+            - AttributeName: "jobId"
+              KeyType: "RANGE"
+          Projection:
+            ProjectionType: "ALL"
+        - IndexName: "state:transitionAt+jobId"
+          KeySchema:
+            - AttributeName: "state"
+              KeyType: "HASH"
+            - AttributeName: "transitionAtJobId"
+              KeyType: "RANGE"
+          Projection:
+            ProjectionType: "ALL"
+      AttributeDefinitions:
+        - AttributeName: "jobId"
+          AttributeType: "S"
+        - AttributeName: "jobType"
+          AttributeType: "S"
+        - AttributeName: "jobTypeState"
+          AttributeType: "S"
+        - AttributeName: "state"
+          AttributeType: "S"
+        - AttributeName: "transitionAtJobId"
+          AttributeType: "S"
+
+
+Outputs:
+
+  DynamoJobTableArn:
+    Description: The arn of the Dynamo Job Table
+    Value: !GetAtt DynamoDBTable.Arn

@@ -1,0 +1,5 @@
+{
+  "scripts": {
+    "deploy": "aws --profile jsonize s3 cp --recursive ./cloudformation s3://cloudformation.jsonize.com/archimedes"
+  }
+}
