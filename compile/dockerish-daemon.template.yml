@@ -1,0 +1,11 @@
+container:
+  name: archimedes/daemon
+  image: archimedes-daemon
+
+dockerfile:
+  from: node:lts
+  commands: |
+    WORKDIR /opt/ziggeo
+    ADD ./src/libs ./libs
+    RUN cp ./src/apps/daemon.js ./index.js
+    ENTRYPOINT node index.js

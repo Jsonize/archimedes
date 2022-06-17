@@ -2,15 +2,15 @@ const DB = require(__dirname + "/db.js")({
     tableName: process.env.DYNAMODB_TABLE,
     partitionKey: "jobId",
     globalIndexes: {
-        "jobType:jobId": {
+        "jobType.jobId": {
             partitionKey: "jobType",
             rangeKey: "jobId"
         },
-        "jobType+State:jobId": {
+        "jobType-State.jobId": {
             partitionKey: "jobTypeState",
             rangeKey: "jobId"
         },
-        "state:transitionAt+jobId": {
+        "state.transitionAt-jobId": {
             partitionKey: "state",
             rangeKey: "transitionAtJobId"
         }
@@ -162,11 +162,11 @@ const Mod = {
     findJobs: function (params) {
         let index = undefined;
         if (params.filter.jobType && params.filter.state)
-            index = "jobType+State:jobId";
+            index = "jobType-State.jobId";
         else if (params.filter.jobType)
-            index = "jobType:jobId";
+            index = "jobType.jobId";
         else if (params.filter.state)
-            index = "state:transitionAt+jobId";
+            index = "state.transitionAt-jobId";
         return DB.find({
             index: index,
             filter: params.filter,
@@ -299,7 +299,7 @@ const Mod = {
     updateJobs: async function () {
         const iterateJobs = async function (state, callback) {
             const jobs = await DB.find({
-                index: "state:transitionAt+jobId",
+                index: "state.transitionAt-jobId",
                 filter: {
                     state: state,
                     transitionAt: {"<": (new Date()).getTime()}

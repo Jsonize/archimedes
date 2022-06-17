@@ -1,0 +1,21 @@
+container:
+  name: archimedes/api-lambda-build
+  image: archimedes-api-lambda-build
+
+run:
+  command: cp /opt/build.zip /mounted/api.zip
+  mounts:
+    - host: cloudformation
+      container: /mounted
+      permission: rw
+
+dockerfile:
+  from: node:lts
+  commands: |
+    WORKDIR /opt
+    RUN apt-get update
+    RUN apt-get install -y zip jq
+    ADD ./src/libs ./libs
+    RUN cp ./src/apps/api.js ./index.js
+    RUN cd /opt
+    RUN zip -q -r build.zip index.js src

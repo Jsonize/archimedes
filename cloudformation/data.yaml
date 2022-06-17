@@ -24,7 +24,7 @@ Resources:
         - AttributeName: "jobId"
           KeyType: "HASH"
       GlobalSecondaryIndexes:
-        - IndexName: "jobType:jobId"
+        - IndexName: "jobType.jobId"
           KeySchema:
             - AttributeName: "jobType"
               KeyType: "HASH"
@@ -32,7 +32,7 @@ Resources:
               KeyType: "RANGE"
           Projection:
             ProjectionType: "ALL"
-        - IndexName: "jobType+State:jobId"
+        - IndexName: "jobType-State.jobId"
           KeySchema:
             - AttributeName: "jobTypeState"
               KeyType: "HASH"
@@ -40,7 +40,7 @@ Resources:
               KeyType: "RANGE"
           Projection:
             ProjectionType: "ALL"
-        - IndexName: "state:transitionAt+jobId"
+        - IndexName: "state.transitionAt-jobId"
           KeySchema:
             - AttributeName: "state"
               KeyType: "HASH"

@@ -1,0 +1,222 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+# https://s3.amazonaws.com/cloudformation.jsonize.com/archimedes/code.yaml
+
+Description: Resources for setting up all code for Archimedes.
+
+
+Parameters:
+
+  ArchimedesName:
+    Type: String
+    Description: The name of the Archimedes distribution
+    Default: archimedes
+
+  DynamoJobTableName:
+    Type: String
+    Description: The name of the DynamoDB job table
+
+  ClusterSecurityGroup:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: Cluster security group
+
+  ClusterSubnets:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: Subnets of cluster
+
+  ClusterName:
+    Type: String
+    Description: Name of target cluster
+
+  JobDefinitions:
+    Type: String
+    Description: Job definitions as JSON
+
+
+Resources:
+
+  JobDispatch:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://s3.amazonaws.com/cloudformation.jsonize.com/job-dispatch.yaml
+      Parameters:
+        TopicName: !Join ["-", [!Ref ArchimedesName, "dispatch"]]
+        ClusterSecurityGroup: !Ref ClusterSecurityGroup
+        ClusterSubnets: !Join [ ",", !Ref ClusterSubnets ]
+        ClusterName: !Ref ClusterName
+        JobTypes: !Ref JobDefinitions
+
+  SNSEventsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: !Join ["-", [!Ref ArchimedesName, "events"]]
+      TopicName: !Join ["-", [!Ref ArchimedesName, "events"]]
+
+  LambdaApi:
+    Type: AWS::Lambda::Function
+    DependsOn:
+      - LambdaApiRole
+    Properties:
+      FunctionName: !Join ["-", [!Ref ArchimedesName, "api"]]
+      Code:
+        S3Bucket: cloudformation.jsonize.com
+        S3Key: archimedes/api.zip
+      Environment:
+        Variables:
+          DYNAMODB_TABLE: !Ref DynamoJobTableName
+          SNS_MESSAGE_TOPIC: !Join ["-", [!Ref ArchimedesName, "events"]]
+          SNS_DISPATCH_TOPIC: !Join ["-", [!Ref ArchimedesName, "dispatch"]]
+      Handler: index.handler
+      Role: !GetAtt LambdaApiRole.Arn
+      Runtime: nodejs12.x
+      Timeout: 60
+
+  LambdaApiRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: "/"
+      Policies:
+        - PolicyName: logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:*
+                Resource:
+                  - arn:aws:logs:*:*:*
+        - PolicyName: dynamodb
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:*
+                Resource:
+                  - !Join [ "", [ "arn:aws:dynamodb:*:*:table/", !Ref DynamoJobTableName ] ]
+        - PolicyName: sns
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sns:Publish
+                Resource:
+                  - !Join ["", ["arn:aws:sns:*:*:", !Ref ArchimedesName, "-events"]]
+                  - !Join ["", ["arn:aws:sns:*:*:", !Ref ArchimedesName, "-dispatch"]]
+
+  DaemonRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Join ["-", [!Ref ArchimedesName, "daemon"]]
+
+  DaemonTask:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - DaemonRepository
+    Properties:
+      TemplateURL: https://s3.amazonaws.com/cloudformation.jsonize.com/ecs-fargate-task.yaml
+      Parameters:
+        TaskName: !Join ["-", [!Ref ArchimedesName, "daemon"]]
+        RepoName: !Join ["-", [!Ref ArchimedesName, "daemon"]]
+        ExecutionRoleArn: !GetAtt DaemonExecutionRole.Arn
+        TaskRoleArn: !GetAtt DaemonTaskRole.Arn
+        CpuUnits: 256
+        MemoryUnits: 512
+        TaskCountMax: 1
+
+  DaemonSchedule:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - DaemonTask
+      - DaemonExecutionRole
+    Properties:
+      TemplateURL: https://s3.amazonaws.com/cloudformation.jsonize.com/ecs-fargate-schedule.yaml
+      Parameters:
+        TaskName: !Join ["-", [!Ref ArchimedesName, "daemon"]]
+        ScheduleName: !Join ["-", [!Ref ArchimedesName, "daemon"]]
+        ScheduleExpression: "rate(1 hour)"
+        ClusterSecurityGroup: !Ref ClusterSecurityGroup
+        ClusterSubnets: !Join [ ",", !Ref ClusterSubnets ]
+        ExecutionRoleArn: !GetAtt DaemonExecutionRole.Arn
+        ClusterName: !Ref ClusterName
+
+  DaemonExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'
+
+  DaemonTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: "/"
+      Policies:
+        - PolicyName: logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:*
+                Resource:
+                  - arn:aws:logs:*:*:*
+        - PolicyName: dynamodb
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:*
+                Resource:
+                  - !Join [ "", [ "arn:aws:dynamodb:*:*:table/", !Ref DynamoJobTableName ] ]
+        - PolicyName: sns
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sns:Publish
+                Resource:
+                  - !Join ["", ["arn:aws:sns:*:*:", !Ref ArchimedesName, "-events"]]
+                  - !Join ["", ["arn:aws:sns:*:*:", !Ref ArchimedesName, "-dispatch"]]
+
+
+Outputs:
+
+  DaemonRepositoryUri:
+    Description: Repository uri of daemon
+    Value: !GetAtt DaemonRepository.RepositoryUri
+
+  LambdaApiArn:
+    Description: The arn of the api lambda
+    Value: !GetAtt LambdaApi.Arn
+
+  EventsTopicName:
+    Description: The name of the events topic
+    Value: !GetAtt SNSEventsTopic.TopicName
+
