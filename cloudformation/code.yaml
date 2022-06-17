@@ -220,3 +220,6 @@ Outputs:
     Description: The name of the events topic
     Value: !GetAtt SNSEventsTopic.TopicName
 
+  EventsArn:
+    Description: The arn of the events topic
+    Value: !Ref SNSEventsTopic
