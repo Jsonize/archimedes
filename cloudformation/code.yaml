@@ -123,6 +123,8 @@ Resources:
     Type: AWS::CloudFormation::Stack
     DependsOn:
       - DaemonRepository
+      - DaemonExecutionRole
+      - DaemonTaskRole
     Properties:
       TemplateURL: https://s3.amazonaws.com/cloudformation.jsonize.com/ecs-fargate-task.yaml
       Parameters:
