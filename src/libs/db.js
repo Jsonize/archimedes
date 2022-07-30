@@ -23,7 +23,7 @@ module.exports = function (params) {
         if (params.compoundKeys) {
             for (let compoundKey in params.compoundKeys) {
                 let compoundValue = params.compoundKeys[compoundKey];
-                if (compoundValue.some(v => v in baseData) && !compoundValue.all(v => v in baseData))
+                if (compoundValue.some(v => v in baseData) && !compoundValue.every(v => v in baseData))
                     return false;
             }
         }
@@ -33,10 +33,11 @@ module.exports = function (params) {
     return {
 
         insert: function (data) {
+            const item = extendCompoundData(data, data);
             return Client.put({
                 TableName: params.tableName,
-                Item: extendCompoundData(data, data)
-            }).promise();
+                Item: item
+            }).promise().then(_ => item);
         },
 
         get: function (key) {

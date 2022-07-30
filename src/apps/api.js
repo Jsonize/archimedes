@@ -1,6 +1,6 @@
 const Service = require(__dirname + "/libs/service.js");
 
-module.exports = {
+const Functions = {
 
     create: Service.createJob,
     get: Service.getJob,
@@ -13,11 +13,15 @@ module.exports = {
 
 };
 
-exports.handler = async function (event, context, callback) {
-    try {
-        let result = await module.exports[event.action].apply(module.exports, event.params);
-        callback(null, result);
-    } catch (e) {
-        callback(e);
-    }
-};
+if (process.env.LAMBDA_TASK_ROOT) {
+    exports.handler = async function (event, context, callback) {
+        try {
+            let result = await Functions[event.action].call(Functions, event.params);
+            callback(null, result);
+        } catch (e) {
+            callback(e);
+        }
+    };
+} else {
+    module.exports = Functions;
+}

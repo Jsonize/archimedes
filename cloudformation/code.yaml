@@ -64,8 +64,8 @@ Resources:
       Environment:
         Variables:
           DYNAMODB_TABLE: !Ref DynamoJobTableName
-          SNS_MESSAGE_TOPIC: !Join ["-", [!Ref ArchimedesName, "events"]]
-          SNS_DISPATCH_TOPIC: !Join ["-", [!Ref ArchimedesName, "dispatch"]]
+          SNS_MESSAGE_TOPIC: !Sub "arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${ArchimedesName}-events"
+          SNS_DISPATCH_TOPIC: !Sub "arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${ArchimedesName}-dispatch"
       Handler: index.handler
       Role: !GetAtt LambdaApiRole.Arn
       Runtime: nodejs12.x

@@ -27,6 +27,10 @@ const Dispatch = require(__dirname + "/dispatch.js")(process.env.SNS_DISPATCH_TO
 
 const Crypto = require('crypto');
 
+function generateRandomID() {
+    return Crypto.randomBytes(16).toString("hex");
+}
+
 const JOB_STATES = {
     OPEN: "OPEN",
     DISPATCH: "DISPATCH",
@@ -49,14 +53,14 @@ const JOB_EXECUTION_STATES = {
 };
 
 const DEFAULTS = {
-    discardTimeout: parseInt(process.env.DISCARD_TIMEOUT, 60),
-    dispatchTimeout: parseInt(process.env.DISPATCH_TIMEOUT, 60),
-    executeTimeout: parseInt(process.env.EXECUTE_TIMEOUT, 60 * 60 * 24 * 7),
-    noprogressTimeout: parseInt(process.env.NOPROGRESS_TIMEOUT, 60 * 60 * 24),
-    rescheduleCooldown: parseInt(process.env.RESCHEDULE_COOLDOWN, 15),
-    maxFailureCount: parseInt(process.env.MAX_FAILURE_COUNT, -1),
-    maxNotReadyCount: parseInt(process.env.MAX_NOT_READY_COUNT, -1),
-    maxTimeoutCount: parseInt(process.env.MAX_TIMEOUT_COUNT, -1),
+    discardTimeout: parseInt(process.env.DISCARD_TIMEOUT, 10) || 60,
+    dispatchTimeout: parseInt(process.env.DISPATCH_TIMEOUT, 10) || 60,
+    executeTimeout: parseInt(process.env.EXECUTE_TIMEOUT, 10) || 60 * 60 * 24 * 7,
+    noprogressTimeout: parseInt(process.env.NOPROGRESS_TIMEOUT, 10) || 60 * 60 * 24,
+    rescheduleCooldown: parseInt(process.env.RESCHEDULE_COOLDOWN, 10) || 15,
+    maxFailureCount: parseInt(process.env.MAX_FAILURE_COUNT, 10) || -1,
+    maxNotReadyCount: parseInt(process.env.MAX_NOT_READY_COUNT, 10) || -1,
+    maxTimeoutCount: parseInt(process.env.MAX_TIMEOUT_COUNT, 10) || -1
 }
 
 const ERRORS = {
@@ -119,7 +123,7 @@ const Mod = {
         const dt = new Date();
         const discardTimeout = params.discardTimeout || DEFAULTS.discardTimeout;
         return DB.insert({
-            jobId: Crypto.randomUUID(),
+            jobId: generateRandomID(),
             jobType: params.jobType,
             createdAt: dt.toISOString(),
             updatedAt: dt.toISOString(),
@@ -176,7 +180,7 @@ const Mod = {
     },
 
     signalJob: function (params) {
-        return Mod.getJob(params.jobId).then(job => {
+        return Mod.getJob(params).then(job => {
             switch (job.state) {
                 case JOB_STATES.OPEN:
                 case JOB_STATES.RESCHEDULE: {
@@ -197,7 +201,7 @@ const Mod = {
                                 pastExecutions.push(job.currentExecution);
                             return DB.update({jobId: params.jobId}, {
                                 currentExecution: {
-                                    executionId: Crypto.randomUUID(),
+                                    executionId: generateRandomID(),
                                     createdAt: (new Date()).toISOString(),
                                     updatedAt: (new Date()).toISOString(),
                                     metrics: {},
@@ -241,7 +245,7 @@ const Mod = {
                     jobExecution[key] = params[key];
             return jobExecution;
         };
-        return Mod.getJob(params.jobId).then(job => {
+        return Mod.getJob(params).then(job => {
             if (params.progress && progress.state === JOB_STATES.EXECUTE) {
                 // TODO: this is not really correct because executeTimeout gets pushed back
                 job.transitionAt = transitionAtBy((new Date()).getTime(), Math.min( + job.noprogressTimeout, job.executeTimeout));
@@ -257,7 +261,7 @@ const Mod = {
     },
 
     signalJobExecution: function (params) {
-        return Mod.getJob(params.jobId).then(job => {
+        return Mod.getJob(params).then(job => {
             let jobExecution = job.currentExecution;
             let isCurrentExecution = true;
             if (!jobExecution || jobExecution.executionId != params.executionId) {

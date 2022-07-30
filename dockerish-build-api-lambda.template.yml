@@ -16,6 +16,5 @@ dockerfile:
     RUN apt-get update
     RUN apt-get install -y zip jq
     ADD ./src/libs ./libs
-    RUN cp ./src/apps/api.js ./index.js
-    RUN cd /opt
-    RUN zip -q -r build.zip index.js src
+    ADD ./src/apps/api.js ./index.js
+    RUN zip -q -r build.zip index.js libs

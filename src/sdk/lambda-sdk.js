@@ -40,5 +40,5 @@ module.exports = function (functionName) {
             return lambdaRequest(functionName, action, params);
         };
     })
-    return ACTIONS;
+    return Actions;
 };

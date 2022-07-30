@@ -2,9 +2,9 @@
   "scripts": {
     "deploy": "aws --profile jsonize s3 cp --recursive ./cloudformation s3://cloudformation.jsonize.com/archimedes",
 
-    "build-api-lambda": "dockerish -t compile/dockerish-build-api-lambda.template.yml -b -r",
-    "deploy-lambda": "awsass --profile <%= args.profile %> --lambda-update-publish-local --lambda-function <%= args.archimedes %>-api --zip-file cloudformation/api.zip",
-    "build-daemon": "dockerish -t compile/dockerish-daemon.template.yml -b",
-    "deploy-daemon": "awsass --profile <%= args.profile %> --ecr-ecs-push-new-revision --task-definition <%= args.archimedes %>-daemon --container-name <%= args.archimedes %>-daemon --local-image-name archimedes-daemon --image-name <%= args.archimedes %>-daemon"
+    "build-api-lambda": "dockerish -t dockerish-build-api-lambda.template.yml -b -r",
+    "deploy-lambda": "awsass --profile <%= args.profile %> --region <%= args.region %> --lambda-update-publish-local --lambda-function <%= args.archimedes %>-api --zip-file cloudformation/api.zip",
+    "build-daemon": "dockerish -t dockerish-daemon.template.yml -b",
+    "deploy-daemon": "awsass --profile <%= args.profile %> --region <%= args.region %> --ecr-ecs-push-new-revision --task-definition <%= args.archimedes %>-daemon --container-name <%= args.archimedes %>-daemon --local-image-name archimedes-daemon --image-name <%= args.archimedes %>-daemon"
   }
 }
