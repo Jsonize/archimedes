@@ -110,7 +110,7 @@ function updateExecutionState(job, params, state, updates) {
     if (params.state !== JOB_EXECUTION_STATES.EXECUTE)
         jobExecution.finishedAt = dt;
     const prom = DB.update({jobId: params.jobId}, doc);
-    return state !== undefined ? prom.then(_ => Messages.c.then(_ => job)) : prom.then(_ => job);
+    return state !== undefined ? prom.then(job => Messages.notify(params.jobId, state).then(_ => job)) : prom;
 }
 
 function transitionAtBy(dt, timeout) {
@@ -199,17 +199,18 @@ const Mod = {
                             let pastExecutions = job.pastExecutions || [];
                             if (job.currentExecution)
                                 pastExecutions.push(job.currentExecution);
+                            job.currentExecution = {
+                                executionId: generateRandomID(),
+                                createdAt: (new Date()).toISOString(),
+                                updatedAt: (new Date()).toISOString(),
+                                metrics: {},
+                                progress: 0.0,
+                                state: JOB_EXECUTION_STATES.EXECUTE,
+                                failureReason: "",
+                                finishedAt: null
+                            };
                             return DB.update({jobId: params.jobId}, {
-                                currentExecution: {
-                                    executionId: generateRandomID(),
-                                    createdAt: (new Date()).toISOString(),
-                                    updatedAt: (new Date()).toISOString(),
-                                    metrics: {},
-                                    progress: 0.0,
-                                    state: JOB_EXECUTION_STATES.EXECUTE,
-                                    failureReason: "",
-                                    finishedAt: null
-                                },
+                                currentExecution: job.currentExecution,
                                 pastExecutions: pastExecutions
                             }).then(_ => updateState(job, params, Math.min(job.noprogressTimeout, job.executeTimeout)));
                         case JOB_STATES.DISCARD:
@@ -222,7 +223,7 @@ const Mod = {
                     switch (params.state) {
                         case JOB_STATES.DISCARD:
                             let currentExecution = job.currentExecution || {};
-                            currentExecution.state = JOF_EXECUTION_STATES.DISCARD;
+                            currentExecution.state = JOB_EXECUTION_STATES.DISCARD;
                             return DB.update({jobId: params.jobId}, {
                                 currentExecution: currentExecution
                             }).then(_ => updateState(job, params));
@@ -246,13 +247,14 @@ const Mod = {
             return jobExecution;
         };
         return Mod.getJob(params).then(job => {
-            if (params.progress && progress.state === JOB_STATES.EXECUTE) {
+            if (params.progress && job.state === JOB_STATES.EXECUTE) {
                 // TODO: this is not really correct because executeTimeout gets pushed back
-                job.transitionAt = transitionAtBy((new Date()).getTime(), Math.min( + job.noprogressTimeout, job.executeTimeout));
+                job.transitionAt = transitionAtBy(new Date(), Math.min( + job.noprogressTimeout, job.executeTimeout));
             }
             job.currentExecution = update(job.currentExecution);
             job.pastExecutions = job.pastExecutions.map(update);
-            return Mod.updateJob(params.jobId, {
+            return Mod.updateJob({
+                jobId: params.jobId,
                 transitionAt: job.transitionAt,
                 currentExecution: job.currentExecution,
                 pastExecutions: job.pastExecutions
@@ -274,21 +276,21 @@ const Mod = {
                 case JOB_EXECUTION_STATES.EXECUTE:
                     switch (params.state) {
                         case JOB_EXECUTION_STATES.DISCARD:
-                            updateExecutionState(job, params, isCurrentExecution ? JOB_STATES.DISCARD : undefined);
+                            return updateExecutionState(job, params, isCurrentExecution ? JOB_STATES.DISCARD : undefined);
                         case JOB_EXECUTION_STATES.SUCCESS:
-                            updateExecutionState(job, params, isCurrentExecution ? JOB_STATES.SUCCESS : undefined);
+                            return updateExecutionState(job, params, isCurrentExecution ? JOB_STATES.SUCCESS : undefined);
                         case JOB_EXECUTION_STATES.FAILURE:
-                            updateExecutionState(job, params,
+                            return updateExecutionState(job, params,
                                 isCurrentExecution ? (job.failureCount >= job.maxFailureCount && job.maxFailureCount >= 0 ? JOB_STATES.RESCHEDULE : JOB_STATES.FAILURE) : undefined,
                                 isCurrentExecution ? {failureCount: job.failureCount + 1} : undefined
                             );
                         case JOB_EXECUTION_STATES.TIMEOUT:
-                            updateExecutionState(job, params,
+                            return updateExecutionState(job, params,
                                 isCurrentExecution ? (job.timeoutCount >= job.maxTimeoutCount && job.maxTimeoutCount >= 0 ? JOB_STATES.RESCHEDULE : JOB_STATES.TIMEOUT) : undefined,
                                 isCurrentExecution ? {timeoutCount: job.timeoutCount + 1} : undefined
                             );
                         case JOB_EXECUTION_STATES.NOTREADY:
-                            updateExecutionState(job, params,
+                            return updateExecutionState(job, params,
                                 isCurrentExecution ? (job.notReadyCount >= job.maxNotReadyCount && job.maxNotReadyCount >= 0 ? JOB_STATES.RESCHEDULE : JOB_STATES.NOTREADY) : undefined,
                                 isCurrentExecution ? {notReadyCount: job.notReadyCount + 1} : undefined
                             );

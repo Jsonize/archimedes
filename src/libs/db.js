@@ -59,17 +59,19 @@ module.exports = function (params) {
                 update = extendCompoundData(update, await this.get(key));
             let au = {};
             for (let k in update) {
+                if (k === params.partitionKey)
+                    continue;
                 au[k] = {
                     "ACTION": "PUT",
                     "Value": update[k]
                 };
             }
-            return await Client.update({
+            return (await Client.update({
                 TableName: params.tableName,
                 Key: key,
                 AttributeUpdates: au,
                 ReturnValues: "ALL_NEW"
-            }).promise();
+            }).promise()).Attributes;
         },
 
         find: function (args) {
