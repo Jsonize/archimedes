@@ -1,5 +1,6 @@
 {
   "name": "archimedes",
+  "version": "1.0.2",
   "main": "src/sdk/lambda-sdk.js",
   "scripts": {
     "deploy": "aws --profile jsonize s3 cp --recursive ./cloudformation s3://cloudformation.jsonize.com/archimedes",
