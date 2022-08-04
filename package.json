@@ -1,5 +1,5 @@
 {
-  "name": "archimedes",
+  "name": "archimedes-jobs",
   "version": "1.0.2",
   "main": "src/sdk/lambda-sdk.js",
   "scripts": {
