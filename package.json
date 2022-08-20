@@ -4,10 +4,13 @@
   "main": "src/sdk/lambda-sdk.js",
   "scripts": {
     "deploy": "aws --profile jsonize s3 cp --recursive ./cloudformation s3://cloudformation.jsonize.com/archimedes",
-
     "build-api-lambda": "dockerish -t dockerish-build-api-lambda.template.yml -b -r",
     "deploy-lambda": "awsass --profile <%= args.profile %> --region <%= args.region %> --lambda-update-publish-local --lambda-function <%= args.archimedes %>-api --zip-file cloudformation/api.zip",
     "build-daemon": "dockerish -t dockerish-daemon.template.yml -b",
-    "deploy-daemon": "awsass --profile <%= args.profile %> --region <%= args.region %> --ecr-ecs-push-new-revision --task-definition <%= args.archimedes %>-daemon --container-name <%= args.archimedes %>-daemon --local-image-name archimedes-daemon --image-name <%= args.archimedes %>-daemon"
+    "deploy-daemon": "awsass --profile <%= args.profile %> --region <%= args.region %> --ecr-ecs-push-new-revision --task-definition <%= args.archimedes %>-daemon --container-name <%= args.archimedes %>-daemon --local-image-name archimedes/daemon:latest --image-name <%= args.awsaccountid %>.dkr.ecr.<%= args.region %>.amazonaws.com/<%= args.archimedes %>-daemon:latest",
+    "run-daemon": "awsass --profile <%= args.profile %> --region <%= args.region %> --ecs-run-on-fargate --cluster-name <%= args.cluster %> --task-definition <%= args.archimedes %>-daemon"
+  },
+  "dependencies": {
+    "aws-sdk": "^2.1189.0"
   }
 }

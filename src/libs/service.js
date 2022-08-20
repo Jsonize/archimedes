@@ -55,12 +55,12 @@ const JOB_EXECUTION_STATES = {
 const DEFAULTS = {
     discardTimeout: parseInt(process.env.DISCARD_TIMEOUT, 10) || 60,
     dispatchTimeout: parseInt(process.env.DISPATCH_TIMEOUT, 10) || 60,
-    executeTimeout: parseInt(process.env.EXECUTE_TIMEOUT, 10) || 60 * 60 * 24 * 7,
-    noprogressTimeout: parseInt(process.env.NOPROGRESS_TIMEOUT, 10) || 60 * 60 * 24,
+    executeTimeout: parseInt(process.env.EXECUTE_TIMEOUT, 10) || (60 * 60 * 24 * 7),
+    noprogressTimeout: parseInt(process.env.NOPROGRESS_TIMEOUT, 10) || (60 * 60 * 24),
     rescheduleCooldown: parseInt(process.env.RESCHEDULE_COOLDOWN, 10) || 15,
-    maxFailureCount: parseInt(process.env.MAX_FAILURE_COUNT, 10) || -1,
-    maxNotReadyCount: parseInt(process.env.MAX_NOT_READY_COUNT, 10) || -1,
-    maxTimeoutCount: parseInt(process.env.MAX_TIMEOUT_COUNT, 10) || -1
+    maxFailureCount: parseInt(process.env.MAX_FAILURE_COUNT, 10) || 5,
+    maxNotReadyCount: parseInt(process.env.MAX_NOT_READY_COUNT, 10) || 5,
+    maxTimeoutCount: parseInt(process.env.MAX_TIMEOUT_COUNT, 10) || 5
 }
 
 const ERRORS = {
@@ -74,6 +74,7 @@ const ERRORS = {
 
 function updateState(job, params, transitionAtTimeout) {
     const dt = new Date();
+    const oldJobState = job.state;
     job.state = params.state;
     job.updatedAt = dt.toISOString();
     let update = {
@@ -83,6 +84,12 @@ function updateState(job, params, transitionAtTimeout) {
     if (transitionAtTimeout) {
         job.transitionAt = transitionAtBy(dt, transitionAtTimeout);
         update.transitionAt = job.transitionAt;
+    }
+
+    if (oldJobState === JOB_STATES.DISPATCH && params.state === JOB_STATES.RESCHEDULE) {
+        update.timeoutCount = job.timeoutCount + 1;
+        if (update.timeoutCount >= job.maxTimeoutCount && job.maxTimeoutCount > -1)
+            update.state = JOB_STATES.TIMEOUT;
     }
     return DB.update({jobId: params.jobId}, update).then(_ => Messages.notify(params.jobId, params.state).then(_ => job));
 }
@@ -195,6 +202,8 @@ const Mod = {
                 }
                 case JOB_STATES.DISPATCH: {
                     switch (params.state) {
+                        case JOB_STATES.RESCHEDULE:
+                            return updateState(job, params);
                         case JOB_STATES.EXECUTE:
                             let pastExecutions = job.pastExecutions || [];
                             if (job.currentExecution)
@@ -303,23 +312,31 @@ const Mod = {
     },
 
     updateJobs: async function () {
+        const now = (new Date()).getTime();
         const iterateJobs = async function (state, callback) {
             const jobs = await DB.find({
                 index: "state.transitionAt-jobId",
                 filter: {
                     state: state,
-                    transitionAt: {"<": (new Date()).getTime()}
+                    transitionAt: {"<": "" + now}
                 }
             });
-            for (let i = 0; i < jobs.length; ++i)
-                await callback(jobs[i]);
+            console.log("Jobs with state", state, jobs.length);
+            for (let i = 0; i < jobs.length; ++i) {
+                try {
+                    console.log("Job", jobs[i].jobId);
+                    await callback(jobs[i]);
+                } catch (e) {
+                    console.log(e);
+                }
+            }
         };
         await iterateJobs(JOB_STATES.OPEN, job => this.signalJob({jobId: job.jobId, state: JOB_STATES.DISCARD}));
         await iterateJobs(JOB_STATES.RESCHEDULE, job => this.signalJob({jobId: job.jobId, state: JOB_STATES.DISPATCH}));
         await iterateJobs(JOB_STATES.DISPATCH, job => this.signalJob({jobId: job.jobId, state: JOB_STATES.RESCHEDULE}));
         await iterateJobs(JOB_STATES.EXECUTE, job => {
-            if (transitionAtBy(new Date(job.currentExecution.updatedAt), job.noprogressTimeout) < now.getTime() ||
-                transitionAtBy(new Date(job.currentExecution.createdAt), job.executeTimeout) < now.getTime()) {
+            if (transitionAtBy(new Date(job.currentExecution.updatedAt), job.noprogressTimeout) < now ||
+                transitionAtBy(new Date(job.currentExecution.createdAt), job.executeTimeout) < now) {
                 this.signalJobExecution({
                     jobId: job.jobId,
                     executionId: job.currentExecution.executionId,

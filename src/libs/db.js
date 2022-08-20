@@ -86,16 +86,16 @@ module.exports = function (params) {
             conditions.push("#p=:p");
             const rangeKey = args.index ? params.globalIndexes[args.index].rangeKey : params.rangeKey;
             if (rangeKey) {
-                const rangeKeys = partitionKey in params.compoundKeys ? params.compoundKeys[partitionKey] : [partitionKey];
+                const rangeKeys = rangeKey in params.compoundKeys ? params.compoundKeys[rangeKey] : [rangeKey];
                 eans["#r"] = rangeKey;
                 const rangeConds = {};
                 rangeKeys.forEach(rk => {
                     let rkf = {};
-                    if (params.filter[rk]) {
-                        if (typeof params.filter[rk] !== "string") {
-                            rkf = params.filter[rk];
+                    if (args.filter[rk]) {
+                        if (typeof args.filter[rk] !== "string") {
+                            rkf = args.filter[rk];
                         } else
-                            rkf["="] = params.filter[rk];
+                            rkf["="] = args.filter[rk];
                     }
                     for (let key in rkf)
                         rangeConds[key] = key in rangeConds ? rangeConds[key] + "-" + rkf[key] : rkf[key];
@@ -103,19 +103,20 @@ module.exports = function (params) {
                 let i = 0;
                 for (let cond in rangeConds) {
                     eavs[":r" + i] = rangeConds[cond];
-                    conditions.push("#r" + modifier + ":r" + i)
+                    conditions.push("#r" + cond + ":r" + i)
                 }
             }
-            return Client.query({
+            const query = {
+                TableName: params.tableName,
                 //ScanIndexForward: ,
-                KeyConditionExpression: conditions.map(function(a) {
-                    return a.join(" ");
-                }).join(" and "),
+                KeyConditionExpression: conditions.join(" and "),
                 ExpressionAttributeNames: eans,
                 ExpressionAttributeValues: eavs,
                 IndexName: args.index || undefined,
                 Limit: args.limit ? args.limit + (args.skip || 0) : undefined
-            }).promise().then(result => {
+            };
+            console.log("Query", query);
+            return Client.query(query).promise().then(result => {
                 let items = result && result.Items ? result.Items : [];
                 if (args.skip && args.skip > 0)
                     items = items.slice(args.skip);

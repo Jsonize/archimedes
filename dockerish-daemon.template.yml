@@ -6,6 +6,8 @@ dockerfile:
   from: node:lts
   commands: |
     WORKDIR /opt/ziggeo
+    ADD package.json ./package.json
+    RUN npm install
     ADD ./src/libs ./libs
-    RUN cp ./src/apps/daemon.js ./index.js
+    ADD ./src/apps/daemon.js ./index.js
     ENTRYPOINT node index.js

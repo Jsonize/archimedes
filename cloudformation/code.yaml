@@ -68,7 +68,7 @@ Resources:
           SNS_DISPATCH_TOPIC: !Sub "arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${ArchimedesName}-dispatch"
       Handler: index.handler
       Role: !GetAtt LambdaApiRole.Arn
-      Runtime: nodejs12.x
+      Runtime: nodejs16.x
       Timeout: 60
 
   LambdaApiRole:
@@ -103,6 +103,7 @@ Resources:
                   - dynamodb:*
                 Resource:
                   - !Join [ "", [ "arn:aws:dynamodb:*:*:table/", !Ref DynamoJobTableName ] ]
+                  - !Join [ "", [ "arn:aws:dynamodb:*:*:table/", !Ref DynamoJobTableName, "/index/*" ] ]
         - PolicyName: sns
           PolicyDocument:
             Version: '2012-10-17'
@@ -196,6 +197,7 @@ Resources:
                   - dynamodb:*
                 Resource:
                   - !Join [ "", [ "arn:aws:dynamodb:*:*:table/", !Ref DynamoJobTableName ] ]
+                  - !Join [ "", [ "arn:aws:dynamodb:*:*:table/", !Ref DynamoJobTableName, "/index/*" ] ]
         - PolicyName: sns
           PolicyDocument:
             Version: '2012-10-17'
@@ -225,3 +227,7 @@ Outputs:
   EventsArn:
     Description: The arn of the events topic
     Value: !Ref SNSEventsTopic
+
+  LambdaApi:
+    Description: The name of the api lambda
+    Value: !Join ["-", [!Ref ArchimedesName, "api"]]

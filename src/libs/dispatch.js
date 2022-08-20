@@ -5,6 +5,7 @@ module.exports = function (topic) {
     return {
 
         dispatchJob: function (job) {
+            console.log("Dispatch", job);
             return SNS.publish({
                 TopicArn: topic,
                 Message: JSON.stringify({
