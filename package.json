@@ -1,7 +1,8 @@
 {
   "name": "archimedes-jobs",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "main": "src/sdk/lambda-sdk.js",
+  "types": "index.d.ts",
   "scripts": {
     "deploy": "aws --profile jsonize s3 cp --recursive ./cloudformation s3://cloudformation.jsonize.com/archimedes",
     "build-api-lambda": "dockerish -t dockerish-build-api-lambda.template.yml -b -r",

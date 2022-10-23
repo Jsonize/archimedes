@@ -7,7 +7,12 @@ Archimedes is an abstract distributed job engine on AWS.
 ### Import SDK
 
 ```js
-const Archimedes = require("archimedes")("<NAME_OF_LAMBDA_FUNCTION>");
+const Archimedes = require("archimedes-jobs")("<NAME_OF_LAMBDA_FUNCTION>");
+```
+
+```js
+import archimedes from "archimedes-jobs";
+const Archimedes = archimedes("<NAME_OF_LAMBDA_FUNCTION>");
 ```
 
 ### Create job
