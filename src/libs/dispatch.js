@@ -12,7 +12,7 @@ module.exports = function (topic) {
                     type: job.jobType,
                     id: job.jobId,
                     estimations: job.estimations,
-                    handler: job.failureCount > 0 ? job.fallbackHandler : null
+                    handler: job.failureCount > 0 || job.timeoutCount > 0 ? job.fallbackHandler : null
                 })
             }).promise();
         }
